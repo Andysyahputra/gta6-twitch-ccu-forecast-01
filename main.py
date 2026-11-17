@@ -233,20 +233,22 @@ def run(input_dir, output_dir):
     for name in names:
         path = os.path.join(input_dir, name)
         case_id = name[:-3]
+        case = None
         try:
             with open(path, "r", encoding="utf-8") as handle:
                 case = json.load(handle)
-            if isinstance(case, dict) and case.get("id"):
-                case_id = str(case["id"])
+        except Exception:
+            case = None
+        if isinstance(case, dict) and case.get("id"):
+            case_id = str(case["id"])
+        try:
+            if not isinstance(case, dict):
+                raise ValueError("case is not a JSON object")
             document = forecast_case(case)
         except Exception:
-            try:
-                with open(path, "r", encoding="utf-8") as handle:
-                    case = json.load(handle)
-                document = persistence_rows(case if isinstance(case, dict) else {})
-            except Exception:
-                document = {"hours": [{"hour": h, "q": [1.0] * 5}
-                                      for h in range(2, 25)]}
+            # A case that cannot be forecast still gets a valid file: every
+            # quantile at hour 1's print, so the case stays scorable.
+            document = persistence_rows(case if isinstance(case, dict) else {})
         out_path = os.path.join(output_dir, case_id + ".out")
         with open(out_path, "w", encoding="utf-8") as handle:
             handle.write(json.dumps(document, separators=(",", ":")) + "\n")
